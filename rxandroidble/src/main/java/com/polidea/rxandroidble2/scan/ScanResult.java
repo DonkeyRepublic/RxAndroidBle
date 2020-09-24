@@ -1,7 +1,9 @@
 package com.polidea.rxandroidble2.scan;
 
+import androidx.annotation.NonNull;
 
 import com.polidea.rxandroidble2.RxBleDevice;
+import com.polidea.rxandroidble2.internal.logger.LoggerUtil;
 
 public class ScanResult {
 
@@ -40,13 +42,14 @@ public class ScanResult {
     }
 
     @Override
+    @NonNull
     public String toString() {
         return "ScanResult{"
                 + "bleDevice=" + bleDevice
                 + ", rssi=" + rssi
                 + ", timestampNanos=" + timestampNanos
                 + ", callbackType=" + callbackType
-                + ", scanRecord=" + scanRecord
+                + ", scanRecord=" + LoggerUtil.bytesToHex(scanRecord.getBytes())
                 + '}';
     }
 }

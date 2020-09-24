@@ -2,14 +2,14 @@ package com.polidea.rxandroidble2.internal.operations;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattService;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import com.polidea.rxandroidble2.RxBleDeviceServices;
 import com.polidea.rxandroidble2.exceptions.BleGattCallbackTimeoutException;
 import com.polidea.rxandroidble2.exceptions.BleGattOperationType;
 import com.polidea.rxandroidble2.internal.SingleResponseOperation;
 import com.polidea.rxandroidble2.internal.connection.RxBleGattCallback;
-import com.polidea.rxandroidble2.internal.util.RxBleServicesLogger;
+import com.polidea.rxandroidble2.internal.logger.LoggerUtilBluetoothServices;
 
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -24,13 +24,13 @@ import io.reactivex.functions.Function;
 
 public class ServiceDiscoveryOperation extends SingleResponseOperation<RxBleDeviceServices> {
 
-    private final BluetoothGatt bluetoothGatt;
-    private final RxBleServicesLogger bleServicesLogger;
+    final BluetoothGatt bluetoothGatt;
+    final LoggerUtilBluetoothServices bleServicesLogger;
 
     ServiceDiscoveryOperation(
             RxBleGattCallback rxBleGattCallback,
             BluetoothGatt bluetoothGatt,
-            RxBleServicesLogger bleServicesLogger,
+            LoggerUtilBluetoothServices bleServicesLogger,
             TimeoutConfiguration timeoutConfiguration) {
         super(bluetoothGatt, rxBleGattCallback, BleGattOperationType.SERVICE_DISCOVERY, timeoutConfiguration);
         this.bluetoothGatt = bluetoothGatt;
@@ -42,7 +42,7 @@ public class ServiceDiscoveryOperation extends SingleResponseOperation<RxBleDevi
         return rxBleGattCallback.getOnServicesDiscovered().firstOrError()
                 .doOnSuccess(new Consumer<RxBleDeviceServices>() {
                     @Override
-                    public void accept(RxBleDeviceServices rxBleDeviceServices) throws Exception {
+                    public void accept(RxBleDeviceServices rxBleDeviceServices) {
                         bleServicesLogger.log(rxBleDeviceServices, bluetoothGatt.getDevice());
                     }
                 });
@@ -76,7 +76,7 @@ public class ServiceDiscoveryOperation extends SingleResponseOperation<RxBleDevi
     ) {
         return Single.defer(new Callable<SingleSource<? extends RxBleDeviceServices>>() {
             @Override
-            public SingleSource<? extends RxBleDeviceServices> call() throws Exception {
+            public SingleSource<? extends RxBleDeviceServices> call() {
                 final List<BluetoothGattService> services = bluetoothGatt.getServices();
                 if (services.size() == 0) {
                     // if after the timeout services are empty we have no other option to declare a failed discovery
@@ -94,7 +94,7 @@ public class ServiceDiscoveryOperation extends SingleResponseOperation<RxBleDevi
                                 public Single<RxBleDeviceServices> apply(Long delayedSeconds) {
                                     return Single.fromCallable(new Callable<RxBleDeviceServices>() {
                                         @Override
-                                        public RxBleDeviceServices call() throws Exception {
+                                        public RxBleDeviceServices call() {
                                             return new RxBleDeviceServices(bluetoothGatt.getServices());
                                         }
                                     });
@@ -103,5 +103,10 @@ public class ServiceDiscoveryOperation extends SingleResponseOperation<RxBleDevi
                 }
             }
         });
+    }
+
+    @Override
+    public String toString() {
+        return "ServiceDiscoveryOperation{" + super.toString() + '}';
     }
 }

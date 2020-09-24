@@ -4,7 +4,8 @@ package com.polidea.rxandroidble2.scan;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.os.Parcel;
 import android.os.Parcelable;
-import android.support.annotation.IntDef;
+import androidx.annotation.IntDef;
+import com.polidea.rxandroidble2.internal.scan.ExternalScanSettingsExtension;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
@@ -18,7 +19,7 @@ import java.lang.annotation.RetentionPolicy;
  * https://code.google.com/p/android/issues/detail?id=178614
  * https://code.google.com/p/android/issues/detail?id=228428
  */
-public class ScanSettings implements Parcelable {
+public class ScanSettings implements Parcelable, ExternalScanSettingsExtension<ScanSettings> {
 
     @IntDef({SCAN_MODE_OPPORTUNISTIC, SCAN_MODE_LOW_POWER, SCAN_MODE_BALANCED, SCAN_MODE_LOW_LATENCY})
     @Retention(RetentionPolicy.SOURCE)
@@ -103,7 +104,7 @@ public class ScanSettings implements Parcelable {
 
     /**
      * Match as many advertisement per filter as hw could allow, depends on current
-     * capability and availibility of the resources in hw
+     * capability and availability of the resources in hw
      */
     public static final int MATCH_NUM_MAX_ADVERTISEMENT = 3;
 
@@ -137,6 +138,8 @@ public class ScanSettings implements Parcelable {
     @MatchNum
     private int mNumOfMatchesPerFilter;
 
+    private boolean mShouldCheckLocationProviderState;
+
     @ScanMode
     public int getScanMode() {
         return mScanMode;
@@ -164,16 +167,22 @@ public class ScanSettings implements Parcelable {
         return mReportDelayMillis;
     }
 
-    private ScanSettings(int scanMode, int callbackType,
-                         long reportDelayMillis, int matchMode, int numOfMatchesPerFilter) {
+    @Override
+    public boolean shouldCheckLocationProviderState() {
+        return mShouldCheckLocationProviderState;
+    }
+
+    ScanSettings(int scanMode, int callbackType,
+                 long reportDelayMillis, int matchMode, int numOfMatchesPerFilter, boolean shouldCheckLocationServicesState) {
         mScanMode = scanMode;
         mCallbackType = callbackType;
         mReportDelayMillis = reportDelayMillis;
         mNumOfMatchesPerFilter = numOfMatchesPerFilter;
         mMatchMode = matchMode;
+        mShouldCheckLocationProviderState = shouldCheckLocationServicesState;
     }
 
-    private ScanSettings(Parcel in) {
+    ScanSettings(Parcel in) {
         //noinspection WrongConstant
         mScanMode = in.readInt();
         //noinspection WrongConstant
@@ -183,6 +192,7 @@ public class ScanSettings implements Parcelable {
         mMatchMode = in.readInt();
         //noinspection WrongConstant
         mNumOfMatchesPerFilter = in.readInt();
+        mShouldCheckLocationProviderState = in.readInt() != 0;
     }
 
     @Override
@@ -192,6 +202,7 @@ public class ScanSettings implements Parcelable {
         dest.writeLong(mReportDelayMillis);
         dest.writeInt(mMatchMode);
         dest.writeInt(mNumOfMatchesPerFilter);
+        dest.writeInt(mShouldCheckLocationProviderState ? 1 : 0);
     }
 
     @Override
@@ -212,16 +223,29 @@ public class ScanSettings implements Parcelable {
         }
     };
 
+    @Override
+    public ScanSettings copyWithCallbackType(@CallbackType int callbackType) {
+        return new ScanSettings(
+                this.mScanMode,
+                callbackType,
+                this.mReportDelayMillis,
+                this.mMatchMode,
+                this.mNumOfMatchesPerFilter,
+                this.mShouldCheckLocationProviderState
+        );
+    }
+
     /**
      * Builder for {@link ScanSettings}.
      */
-    public static final class Builder {
+    public static final class Builder implements ExternalScanSettingsExtension.Builder {
 
         private int mScanMode = SCAN_MODE_LOW_POWER;
         private int mCallbackType = CALLBACK_TYPE_ALL_MATCHES;
         private long mReportDelayMillis = 0;
         private int mMatchMode = MATCH_MODE_AGGRESSIVE;
         private int mNumOfMatchesPerFilter = MATCH_NUM_MAX_ADVERTISEMENT;
+        private boolean mShouldCheckLocationProviderState = true;
 
         /**
          * Set scan mode for Bluetooth LE scan.
@@ -254,8 +278,19 @@ public class ScanSettings implements Parcelable {
             return this;
         }
 
+        /**
+         * {@inheritDoc}
+         * If set to true and Location Services are off a {@link com.polidea.rxandroidble2.exceptions.BleScanException} will be emitted.
+         * <p>Default: true.</p>
+         */
+        @Override
+        public ScanSettings.Builder setShouldCheckLocationServicesState(boolean shouldCheck) {
+            mShouldCheckLocationProviderState = shouldCheck;
+            return this;
+        }
+
         // Returns true if the callbackType is valid.
-        private boolean isValidCallbackType(int callbackType) {
+        private static boolean isValidCallbackType(int callbackType) {
             if (callbackType == CALLBACK_TYPE_ALL_MATCHES
                     || callbackType == CALLBACK_TYPE_FIRST_MATCH
                     || callbackType == CALLBACK_TYPE_MATCH_LOST) {
@@ -321,7 +356,7 @@ public class ScanSettings implements Parcelable {
          */
         public ScanSettings build() {
             return new ScanSettings(mScanMode, mCallbackType,
-                    mReportDelayMillis, mMatchMode, mNumOfMatchesPerFilter);
+                    mReportDelayMillis, mMatchMode, mNumOfMatchesPerFilter, mShouldCheckLocationProviderState);
         }
     }
 }

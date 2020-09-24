@@ -2,10 +2,9 @@ package com.polidea.rxandroidble2.internal.scan;
 
 
 import android.annotation.SuppressLint;
-import android.os.Build;
-import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+import androidx.annotation.RestrictTo;
 import com.polidea.rxandroidble2.ClientComponent;
 import com.polidea.rxandroidble2.scan.ScanFilter;
 import com.polidea.rxandroidble2.scan.ScanSettings;
@@ -26,10 +25,10 @@ public class AndroidScanObjectsConverter {
 
     // TODO [DS 18.05.2017] Consider a different implementation for Marshmallow
     @SuppressLint("NewApi")
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
     public android.bluetooth.le.ScanSettings toNativeSettings(ScanSettings scanSettings) {
         final android.bluetooth.le.ScanSettings.Builder builder = new android.bluetooth.le.ScanSettings.Builder();
-        if (deviceSdk >= Build.VERSION_CODES.M) {
+        if (deviceSdk >= 23 /* Build.VERSION_CODES.M */) {
             setMarshmallowSettings(scanSettings, builder);
         }
         return builder
@@ -38,8 +37,8 @@ public class AndroidScanObjectsConverter {
                 .build();
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
-    private void setMarshmallowSettings(ScanSettings scanSettings, android.bluetooth.le.ScanSettings.Builder builder) {
+    @RequiresApi(23 /* Build.VERSION_CODES.M */)
+    private static void setMarshmallowSettings(ScanSettings scanSettings, android.bluetooth.le.ScanSettings.Builder builder) {
         builder
                 .setCallbackType(scanSettings.getCallbackType())
                 .setMatchMode(scanSettings.getMatchMode())
@@ -47,7 +46,7 @@ public class AndroidScanObjectsConverter {
     }
 
     @Nullable
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
     public List<android.bluetooth.le.ScanFilter> toNativeFilters(ScanFilter... scanFilters) {
         final boolean isFilteringDefined = scanFilters != null && scanFilters.length > 0;
         final List<android.bluetooth.le.ScanFilter> returnList;
@@ -62,8 +61,8 @@ public class AndroidScanObjectsConverter {
         return returnList;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-    private android.bluetooth.le.ScanFilter toNative(ScanFilter scanFilter) {
+    @RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
+    private static android.bluetooth.le.ScanFilter toNative(ScanFilter scanFilter) {
         final android.bluetooth.le.ScanFilter.Builder builder = new android.bluetooth.le.ScanFilter.Builder();
         if (scanFilter.getServiceDataUuid() != null) {
             builder.setServiceData(scanFilter.getServiceDataUuid(), scanFilter.getServiceData(), scanFilter.getServiceDataMask());

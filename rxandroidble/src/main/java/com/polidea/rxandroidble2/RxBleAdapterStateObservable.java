@@ -5,14 +5,16 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.support.annotation.NonNull;
-import android.util.Log;
+import androidx.annotation.NonNull;
 
 import bleshadow.javax.inject.Inject;
+import com.polidea.rxandroidble2.internal.RxBleLog;
 import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.Observer;
-import io.reactivex.disposables.Disposables;
-import io.reactivex.functions.Action;
+import io.reactivex.functions.Cancellable;
+import io.reactivex.schedulers.Schedulers;
 
 /**
  * Observes Bluetooth adapter state. This responds to user interactions as well as system controlled state changes.
@@ -24,59 +26,67 @@ public class RxBleAdapterStateObservable extends Observable<RxBleAdapterStateObs
 
     public static class BleAdapterState {
 
-        public static final BleAdapterState STATE_ON = new BleAdapterState(true);
-        public static final BleAdapterState STATE_OFF = new BleAdapterState(false);
-        public static final BleAdapterState STATE_TURNING_ON = new BleAdapterState(false);
-        public static final BleAdapterState STATE_TURNING_OFF = new BleAdapterState(false);
+        public static final BleAdapterState STATE_ON = new BleAdapterState(true, "STATE_ON");
+        public static final BleAdapterState STATE_OFF = new BleAdapterState(false, "STATE_OFF");
+        public static final BleAdapterState STATE_TURNING_ON = new BleAdapterState(false, "STATE_TURNING_ON");
+        public static final BleAdapterState STATE_TURNING_OFF = new BleAdapterState(false, "STATE_TURNING_OFF");
 
         private final boolean isUsable;
+        private final String stateName;
 
-        private BleAdapterState(boolean isUsable) {
+        private BleAdapterState(boolean isUsable, String stateName) {
             this.isUsable = isUsable;
+            this.stateName = stateName;
         }
 
         public boolean isUsable() {
             return isUsable;
         }
+
+        @Override
+        @NonNull
+        public String toString() {
+            return stateName;
+        }
     }
 
-    private static final String TAG = "AdapterStateObs";
-
     @NonNull
-    private final Context context;
+    private final Observable<BleAdapterState> bleAdapterStateObservable;
 
     @Inject
     public RxBleAdapterStateObservable(@NonNull final Context context) {
-        this.context = context;
+        bleAdapterStateObservable = Observable.create(new ObservableOnSubscribe<BleAdapterState>() {
+            @Override
+            public void subscribe(final ObservableEmitter<BleAdapterState> emitter) {
+                final BroadcastReceiver receiver = new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
+                        BleAdapterState internalState = mapToBleAdapterState(state);
+                        RxBleLog.i("Adapter state changed: %s", internalState);
+                        emitter.onNext(internalState);
+                    }
+                };
+                context.registerReceiver(receiver, new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED));
+                emitter.setCancellable(new Cancellable() {
+                    @Override
+                    public void cancel() {
+                        context.unregisterReceiver(receiver);
+                    }
+                });
+            }
+        })
+                .subscribeOn(Schedulers.trampoline())
+                .unsubscribeOn(Schedulers.trampoline())
+                .share();
     }
 
     @Override
     protected void subscribeActual(final Observer<? super BleAdapterState> observer) {
-        final BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-
-                if (BluetoothAdapter.ACTION_STATE_CHANGED.equals(action)) {
-                    int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
-                    observer.onNext(mapToBleAdapterState(state));
-                }
-            }
-        };
-        observer.onSubscribe(Disposables.fromAction(new Action() {
-            @Override
-            public void run() throws Exception {
-                try {
-                    context.unregisterReceiver(receiver);
-                } catch (IllegalArgumentException exception) {
-                    Log.d(TAG, "The receiver is already not registered.");
-                }
-            }
-        }));
-        context.registerReceiver(receiver, createFilter());
+        bleAdapterStateObservable.subscribe(observer);
     }
 
-    private static BleAdapterState mapToBleAdapterState(int state) {
+    static BleAdapterState mapToBleAdapterState(int state) {
 
         switch (state) {
             case BluetoothAdapter.STATE_ON:
@@ -89,9 +99,5 @@ public class RxBleAdapterStateObservable extends Observable<RxBleAdapterStateObs
             default:
                 return BleAdapterState.STATE_OFF;
         }
-    }
-
-    private static IntentFilter createFilter() {
-        return new IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED);
     }
 }

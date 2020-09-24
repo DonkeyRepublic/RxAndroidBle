@@ -1,10 +1,10 @@
 package com.polidea.rxandroidble2.sample.example2_connection;
 
 import android.annotation.TargetApi;
-import android.os.Build;
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
-import android.support.v7.widget.SwitchCompat;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
+import com.google.android.material.snackbar.Snackbar;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -14,18 +14,15 @@ import com.polidea.rxandroidble2.RxBleDevice;
 import com.polidea.rxandroidble2.sample.DeviceActivity;
 import com.polidea.rxandroidble2.sample.R;
 import com.polidea.rxandroidble2.sample.SampleApplication;
-import com.trello.rxlifecycle2.components.support.RxAppCompatActivity;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 
-import static com.trello.rxlifecycle2.android.ActivityEvent.DESTROY;
-import static com.trello.rxlifecycle2.android.ActivityEvent.PAUSE;
-
-public class ConnectionExampleActivity extends RxAppCompatActivity {
+public class ConnectionExampleActivity extends AppCompatActivity {
 
     @BindView(R.id.connection_state)
     TextView connectionStateView;
@@ -39,6 +36,8 @@ public class ConnectionExampleActivity extends RxAppCompatActivity {
     SwitchCompat autoConnectToggleSwitch;
     private RxBleDevice bleDevice;
     private Disposable connectionDisposable;
+    private final CompositeDisposable mtuDisposable = new CompositeDisposable();
+    private Disposable stateDisposable;
 
     @OnClick(R.id.connect_toggle)
     public void onConnectToggleClick() {
@@ -46,23 +45,22 @@ public class ConnectionExampleActivity extends RxAppCompatActivity {
             triggerDisconnect();
         } else {
             connectionDisposable = bleDevice.establishConnection(autoConnectToggleSwitch.isChecked())
-                    .compose(bindUntilEvent(PAUSE))
                     .observeOn(AndroidSchedulers.mainThread())
                     .doFinally(this::dispose)
                     .subscribe(this::onConnectionReceived, this::onConnectionFailure);
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    @TargetApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
     @OnClick(R.id.set_mtu)
     public void onSetMtu() {
-        bleDevice.establishConnection(false)
+        final Disposable disposable = bleDevice.establishConnection(false)
                 .flatMapSingle(rxBleConnection -> rxBleConnection.requestMtu(72))
                 .take(1) // Disconnect automatically after discovery
-                .compose(bindUntilEvent(PAUSE))
                 .observeOn(AndroidSchedulers.mainThread())
                 .doFinally(this::updateUI)
                 .subscribe(this::onMtuReceived, this::onConnectionFailure);
+        mtuDisposable.add(disposable);
     }
 
     @Override
@@ -74,8 +72,8 @@ public class ConnectionExampleActivity extends RxAppCompatActivity {
         setTitle(getString(R.string.mac_address, macAddress));
         bleDevice = SampleApplication.getRxBleClient(this).getBleDevice(macAddress);
         // How to listen for connection state changes
-        bleDevice.observeConnectionStateChanges()
-                .compose(bindUntilEvent(DESTROY))
+        // Note: it is meant for UI updates only — one should not observeConnectionStateChanges() with BLE connection logic
+        stateDisposable = bleDevice.observeConnectionStateChanges()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::onConnectionStateChange);
     }
@@ -121,5 +119,22 @@ public class ConnectionExampleActivity extends RxAppCompatActivity {
         final boolean connected = isConnected();
         connectButton.setText(connected ? R.string.disconnect : R.string.connect);
         autoConnectToggleSwitch.setEnabled(!connected);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        triggerDisconnect();
+        mtuDisposable.clear();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        if (stateDisposable != null) {
+            stateDisposable.dispose();
+        }
     }
 }

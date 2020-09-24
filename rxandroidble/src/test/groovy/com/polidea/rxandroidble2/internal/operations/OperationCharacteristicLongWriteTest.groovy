@@ -12,14 +12,18 @@ import com.polidea.rxandroidble2.internal.connection.RxBleGattCallback
 import com.polidea.rxandroidble2.internal.serialization.QueueReleaseInterface
 import com.polidea.rxandroidble2.internal.util.ByteAssociation
 import com.polidea.rxandroidble2.internal.util.MockOperationTimeoutConfiguration
+import com.polidea.rxandroidble2.internal.util.QueueReleasingEmitterWrapper
 import io.reactivex.Observable
 import io.reactivex.ObservableSource
 import io.reactivex.Scheduler
 import io.reactivex.annotations.NonNull
 import io.reactivex.functions.Function
+import io.reactivex.observers.TestObserver
+import io.reactivex.plugins.RxJavaPlugins
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.schedulers.TestScheduler
 import io.reactivex.subjects.PublishSubject
+import java.util.concurrent.atomic.AtomicReference
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -540,6 +544,52 @@ class OperationCharacteristicLongWriteTest extends Specification {
         ]
     }
 
+    def "unsuccessful writeCharacteristic() should not pass error to RxJavaPlugins.onErrorHandler() if Observable was disposed"() {
+
+        given:
+        def capturedException = captureRxUnhandledExceptions()
+        def testScheduler = new TestScheduler()
+        givenWillWriteNextBatchImmediatelyAfterPrevious()
+        givenCharacteristicWriteOkButEventuallyFailsToStart(0)
+        prepareObjectUnderTest(1, byteArray(20), testScheduler)
+        objectUnderTest.run(mockQueueReleaseInterface).test().dispose()
+
+        when:
+        testScheduler.triggerActions()
+
+        then:
+        capturedException.get() == null
+
+        cleanup:
+        RxJavaPlugins.setErrorHandler(null)
+    }
+
+    ////////////////////// Testing repetition logic implementation
+
+    def "should emit repeat until ByteBuffer is empty"() {
+
+        given:
+        PublishSubject completionSubject = PublishSubject.create()
+        QueueReleasingEmitterWrapper mockQueueReleasingEmitterWrapper = Mock(QueueReleasingEmitterWrapper)
+        mockQueueReleasingEmitterWrapper.isWrappedEmitterUnsubscribed() >> false
+        Observable repetitionObservable = CharacteristicLongWriteOperation
+                .bufferIsNotEmptyAndOperationHasBeenAcknowledgedAndNotUnsubscribed(
+                        new ImmediateSerializedBatchAckStrategy(),
+                        ByteBuffer.allocate(0),
+                        mockQueueReleasingEmitterWrapper
+                )
+                .apply(completionSubject)
+        TestObserver testObserver = repetitionObservable.test()
+
+        when:
+        completionSubject.onNext(new Object())
+
+        then:
+        testObserver.assertNoValues()
+    }
+
+    ////////////////////// Helpers
+
     private void givenWillWriteNextBatchImmediatelyAfterPrevious() {
         writeOperationAckStrategy = new ImmediateSerializedBatchAckStrategy()
         writeOperationRetryStrategy = new NoRetryStrategy()
@@ -722,11 +772,23 @@ class OperationCharacteristicLongWriteTest extends Specification {
         }
     }
 
+    private static AtomicReference<Throwable> captureRxUnhandledExceptions() {
+        AtomicReference<Throwable> unhandledExceptionAtomicReference = new AtomicReference<>()
+        RxJavaPlugins.setErrorHandler({ throwable ->
+            unhandledExceptionAtomicReference.set(throwable)
+        })
+        return unhandledExceptionAtomicReference
+    }
+
     private prepareObjectUnderTest(int maxBatchSize, byte[] testData) {
+        prepareObjectUnderTest(maxBatchSize, testData, immediateScheduler)
+    }
+
+    private prepareObjectUnderTest(int maxBatchSize, byte[] testData, Scheduler scheduler) {
         objectUnderTest = new CharacteristicLongWriteOperation(
                 mockGatt,
                 mockCallback,
-                immediateScheduler,
+                scheduler,
                 new MockOperationTimeoutConfiguration(10, timeoutScheduler),
                 mockCharacteristic,
                 { maxBatchSize },

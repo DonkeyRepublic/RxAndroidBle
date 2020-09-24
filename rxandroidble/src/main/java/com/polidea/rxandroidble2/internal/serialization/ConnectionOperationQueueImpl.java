@@ -1,6 +1,6 @@
 package com.polidea.rxandroidble2.internal.serialization;
 
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RestrictTo;
 
 import com.polidea.rxandroidble2.ClientComponent;
 import com.polidea.rxandroidble2.exceptions.BleDisconnectedException;
@@ -25,10 +25,12 @@ import io.reactivex.Scheduler;
 import io.reactivex.functions.Cancellable;
 import io.reactivex.observers.DisposableObserver;
 
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationFinished;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationQueued;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationRemoved;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationStarted;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.commonMacMessage;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationFinished;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationQueued;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationRemoved;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationRunning;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationStarted;
 
 @ConnectionScope
 public class ConnectionOperationQueueImpl implements ConnectionOperationQueue, ConnectionSubscriptionWatcher {
@@ -36,9 +38,9 @@ public class ConnectionOperationQueueImpl implements ConnectionOperationQueue, C
     private final String deviceMacAddress;
     private final DisconnectionRouterOutput disconnectionRouterOutput;
     private DisposableObserver<BleException> disconnectionThrowableSubscription;
-    private final OperationPriorityFifoBlockingQueue queue = new OperationPriorityFifoBlockingQueue();
+    final OperationPriorityFifoBlockingQueue queue = new OperationPriorityFifoBlockingQueue();
     private final Future<?> runnableFuture;
-    private volatile boolean shouldRun = true;
+    volatile boolean shouldRun = true;
     private BleException disconnectionException = null;
 
     @Inject
@@ -60,6 +62,7 @@ public class ConnectionOperationQueueImpl implements ConnectionOperationQueue, C
                         final Operation<?> operation = entry.operation;
                         final long startedAtTime = System.currentTimeMillis();
                         logOperationStarted(operation);
+                        logOperationRunning(operation);
 
                         /*
                          * Calling bluetooth calls before the previous one returns in a callback usually finishes with a failure
@@ -81,12 +84,12 @@ public class ConnectionOperationQueueImpl implements ConnectionOperationQueue, C
                 }
 
                 flushQueue();
-                RxBleLog.d("Terminated.");
+                RxBleLog.v("Terminated (%s)", commonMacMessage(deviceMacAddress));
             }
         });
     }
 
-    private synchronized void flushQueue() {
+    synchronized void flushQueue() {
         while (!queue.isEmpty()) {
             final FIFORunnableEntry<?> entryToFinish = queue.takeNow();
             entryToFinish.operationResultObserver.tryOnError(disconnectionException);
@@ -102,11 +105,11 @@ public class ConnectionOperationQueueImpl implements ConnectionOperationQueue, C
 
         return Observable.create(new ObservableOnSubscribe<T>() {
             @Override
-            public void subscribe(ObservableEmitter<T> emitter) throws Exception {
+            public void subscribe(ObservableEmitter<T> emitter) {
                 final FIFORunnableEntry entry = new FIFORunnableEntry<>(operation, emitter);
                 emitter.setCancellable(new Cancellable() {
                     @Override
-                    public void cancel() throws Exception {
+                    public void cancel() {
                         if (queue.remove(entry)) {
                             logOperationRemoved(operation);
                         }
@@ -125,7 +128,7 @@ public class ConnectionOperationQueueImpl implements ConnectionOperationQueue, C
             // already terminated
             return;
         }
-        RxBleLog.i("Connection operations queue to be terminated (" + deviceMacAddress + ')');
+        RxBleLog.d(disconnectException, "Connection operations queue to be terminated (%s)", commonMacMessage(deviceMacAddress));
         shouldRun = false;
         disconnectionException = disconnectException;
         runnableFuture.cancel(true);

@@ -1,6 +1,6 @@
 package com.polidea.rxandroidble2.internal.serialization;
 
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RestrictTo;
 
 import com.polidea.rxandroidble2.ClientComponent;
 import com.polidea.rxandroidble2.internal.RxBleLog;
@@ -15,27 +15,28 @@ import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.Scheduler;
 import io.reactivex.disposables.Disposables;
 import io.reactivex.functions.Action;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationFinished;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationQueued;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationRemoved;
-import static com.polidea.rxandroidble2.internal.util.OperationLogger.logOperationStarted;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationFinished;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationQueued;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationRemoved;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationRunning;
+import static com.polidea.rxandroidble2.internal.logger.LoggerUtil.logOperationStarted;
 
 public class ClientOperationQueueImpl implements ClientOperationQueue {
 
-    private OperationPriorityFifoBlockingQueue queue = new OperationPriorityFifoBlockingQueue();
+    final OperationPriorityFifoBlockingQueue queue = new OperationPriorityFifoBlockingQueue();
 
     @Inject
     public ClientOperationQueueImpl(@Named(ClientComponent.NamedSchedulers.BLUETOOTH_INTERACTION) final Scheduler callbackScheduler) {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                //noinspection InfiniteLoopStatement
                 while (true) {
                     try {
                         final FIFORunnableEntry<?> entry = queue.take();
                         final Operation<?> operation = entry.operation;
                         final long startedAtTime = System.currentTimeMillis();
                         logOperationStarted(operation);
+                        logOperationRunning(operation);
 
                         /*
                          * Calling bluetooth calls before the previous one returns in a callback usually finishes with a failure
@@ -59,12 +60,12 @@ public class ClientOperationQueueImpl implements ClientOperationQueue {
     public <T> Observable<T> queue(final Operation<T> operation) {
         return Observable.create(new ObservableOnSubscribe<T>() {
             @Override
-            public void subscribe(ObservableEmitter<T> tEmitter) throws Exception {
+            public void subscribe(ObservableEmitter<T> tEmitter) {
                 final FIFORunnableEntry entry = new FIFORunnableEntry<>(operation, tEmitter);
 
                 tEmitter.setDisposable(Disposables.fromAction(new Action() {
                     @Override
-                    public void run() throws Exception {
+                    public void run() {
                         if (queue.remove(entry)) {
                             logOperationRemoved(operation);
                         }
@@ -75,13 +76,5 @@ public class ClientOperationQueueImpl implements ClientOperationQueue {
                 queue.add(entry);
             }
         });
-    }
-
-    @RestrictTo(RestrictTo.Scope.SUBCLASSES)
-    private void log(String prefix, Operation operation) {
-
-        if (RxBleLog.isAtLeast(RxBleLog.DEBUG)) {
-            RxBleLog.d("%8s %s(%d)", prefix, operation.getClass().getSimpleName(), System.identityHashCode(operation));
-        }
     }
 }

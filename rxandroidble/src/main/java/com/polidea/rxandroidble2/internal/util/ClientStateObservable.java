@@ -1,7 +1,7 @@
 package com.polidea.rxandroidble2.internal.util;
 
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import com.polidea.rxandroidble2.ClientComponent;
 import com.polidea.rxandroidble2.RxBleAdapterStateObservable;
@@ -23,14 +23,14 @@ import io.reactivex.functions.Predicate;
 /**
  * The Observable class which emits changes to the Client State. These can be useful for evaluating if particular functionality
  * of the library has a chance to work properly.
- *
+ * <p>
  * For more info check {@link RxBleClient.State}
  */
 public class ClientStateObservable extends Observable<RxBleClient.State> {
 
-    private final RxBleAdapterWrapper rxBleAdapterWrapper;
-    private final Observable<RxBleAdapterStateObservable.BleAdapterState> bleAdapterStateObservable;
-    private final Observable<Boolean> locationServicesOkObservable;
+    final RxBleAdapterWrapper rxBleAdapterWrapper;
+    final Observable<RxBleAdapterStateObservable.BleAdapterState> bleAdapterStateObservable;
+    final Observable<Boolean> locationServicesOkObservable;
     private final LocationServicesStatus locationServicesStatus;
     private final Scheduler timerScheduler;
 
@@ -51,8 +51,9 @@ public class ClientStateObservable extends Observable<RxBleClient.State> {
 
     /**
      * Observable that emits `true` if the permission was granted on the time of subscription
+     *
      * @param locationServicesStatus the LocationServicesStatus
-     * @param timerScheduler the Scheduler
+     * @param timerScheduler         the Scheduler
      * @return the observable
      */
     @NonNull
@@ -70,7 +71,7 @@ public class ClientStateObservable extends Observable<RxBleClient.State> {
                 .count()
                 .map(new Function<Long, Boolean>() {
                     @Override
-                    public Boolean apply(Long count) throws Exception {
+                    public Boolean apply(Long count) {
                         // if no elements were emitted then the permission was granted from the beginning
                         return count == 0;
                     }
@@ -78,13 +79,12 @@ public class ClientStateObservable extends Observable<RxBleClient.State> {
     }
 
     @NonNull
-    private static Observable<RxBleClient.State> checkAdapterAndServicesState(
-            Boolean permissionWasInitiallyGranted,
+    static Observable<RxBleClient.State> checkAdapterAndServicesState(
             RxBleAdapterWrapper rxBleAdapterWrapper,
             Observable<RxBleAdapterStateObservable.BleAdapterState> rxBleAdapterStateObservable,
             final Observable<Boolean> locationServicesOkObservable
     ) {
-        final Observable<RxBleClient.State> stateObservable = rxBleAdapterStateObservable
+        return rxBleAdapterStateObservable
                 .startWith(rxBleAdapterWrapper.isBluetoothEnabled()
                         ? RxBleAdapterStateObservable.BleAdapterState.STATE_ON
                         /*
@@ -109,13 +109,6 @@ public class ClientStateObservable extends Observable<RxBleClient.State> {
                         }
                     }
                 });
-        return permissionWasInitiallyGranted
-                /*
-                If permission was granted from the beginning then the first value is not a change as the above Observable does emit value
-                at the moment of Subscription.
-                 */
-                ? stateObservable.skip(1)
-                : stateObservable;
     }
 
     @Override
@@ -130,15 +123,21 @@ public class ClientStateObservable extends Observable<RxBleClient.State> {
                 .flatMapObservable(new Function<Boolean, Observable<RxBleClient.State>>() {
                     @Override
                     public Observable<RxBleClient.State> apply(Boolean permissionWasInitiallyGranted) {
-                        return checkAdapterAndServicesState(
-                                permissionWasInitiallyGranted,
+                        Observable<RxBleClient.State> stateObservable = checkAdapterAndServicesState(
                                 rxBleAdapterWrapper,
                                 bleAdapterStateObservable,
                                 locationServicesOkObservable
-                        );
+                        )
+                                .distinctUntilChanged();
+                        return permissionWasInitiallyGranted
+                                /*
+                                 * If permission was granted from the beginning then the first value is not a change. The above Observable
+                                 * does emit value at the moment of subscription.
+                                 */
+                                ? stateObservable.skip(1)
+                                : stateObservable;
                     }
                 })
-                .distinctUntilChanged()
                 .subscribe(observer);
     }
 }

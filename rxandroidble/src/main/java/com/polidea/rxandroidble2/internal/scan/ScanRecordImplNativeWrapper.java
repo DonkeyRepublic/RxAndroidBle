@@ -1,17 +1,16 @@
 package com.polidea.rxandroidble2.internal.scan;
 
 
-import android.os.Build;
 import android.os.ParcelUuid;
-import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+import androidx.annotation.RestrictTo;
 import android.util.SparseArray;
 import com.polidea.rxandroidble2.scan.ScanRecord;
 import java.util.List;
 import java.util.Map;
 
-@RequiresApi(Build.VERSION_CODES.LOLLIPOP)
+@RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
 public class ScanRecordImplNativeWrapper implements ScanRecord {
 

@@ -1,11 +1,12 @@
 package com.polidea.rxandroidble2.internal.util;
 
 import android.os.ParcelUuid;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.RestrictTo;
 import android.util.SparseArray;
 
+import com.polidea.rxandroidble2.internal.logger.LoggerUtil;
 import com.polidea.rxandroidble2.internal.scan.ScanRecordImplCompat;
 import com.polidea.rxandroidble2.scan.ScanRecord;
 import com.polidea.rxandroidble2.internal.RxBleLog;
@@ -30,6 +31,7 @@ import bleshadow.javax.inject.Inject;
  * This class may change in later releases.
  */
 @Deprecated
+@SuppressWarnings("deprecation")
 public class UUIDUtil {
 
     // The following data type values are assigned by Bluetooth SIG.
@@ -67,7 +69,7 @@ public class UUIDUtil {
         ByteBuffer buffer = ByteBuffer.wrap(scanResult).order(ByteOrder.LITTLE_ENDIAN);
 
         while (buffer.remaining() > 2) {
-            byte length = buffer.get();
+            int length = buffer.get() & 0xFF; // convert to unsigned
             if (length == 0) break;
 
             byte type = buffer.get();
@@ -86,6 +88,7 @@ public class UUIDUtil {
                         uuids.add(UUID.fromString(String.format(UUID_BASE_FORMAT, buffer.getInt())));
                         length -= 4;
                     }
+                    break;
 
                 case DATA_TYPE_SERVICE_UUIDS_128_BIT_PARTIAL: // Partial list of 128-bit UUIDs
                 case DATA_TYPE_SERVICE_UUIDS_128_BIT_COMPLETE: // Complete list of 128-bit UUIDs
@@ -98,7 +101,8 @@ public class UUIDUtil {
                     break;
 
                 default:
-                    buffer.position(buffer.position() + length - 1);
+                    int safeLengthToProceed = Math.min(length - 1, buffer.remaining());
+                    buffer.position(buffer.position() + safeLengthToProceed);
                     break;
             }
         }
@@ -123,7 +127,7 @@ public class UUIDUtil {
 
         int currentPos = 0;
         int advertiseFlag = -1;
-        List<ParcelUuid> serviceUuids = new ArrayList<ParcelUuid>();
+        List<ParcelUuid> serviceUuids = new ArrayList<>();
         String localName = null;
         int txPowerLevel = Integer.MIN_VALUE;
 
@@ -201,7 +205,7 @@ public class UUIDUtil {
             return new ScanRecordImplCompat(serviceUuids, manufacturerData, serviceData,
                     advertiseFlag, txPowerLevel, localName, scanRecord);
         } catch (Exception e) {
-            RxBleLog.e(e, "unable to parse scan record: " + Arrays.toString(scanRecord));
+            RxBleLog.e(e, "Unable to parse scan record: %s", LoggerUtil.bytesToHex(scanRecord));
             // As the record is invalid, ignore all the parsed results for this packet
             // and return an empty record with raw scanRecord bytes in results
             return new ScanRecordImplCompat(null, null, null, -1, Integer.MIN_VALUE, null, scanRecord);

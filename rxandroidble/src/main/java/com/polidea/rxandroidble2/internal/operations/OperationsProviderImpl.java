@@ -3,15 +3,14 @@ package com.polidea.rxandroidble2.internal.operations;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
-import android.os.Build;
-import android.support.annotation.RequiresApi;
+import androidx.annotation.RequiresApi;
 
 import com.polidea.rxandroidble2.ClientComponent;
 import com.polidea.rxandroidble2.RxBleConnection;
 import com.polidea.rxandroidble2.internal.connection.ConnectionModule;
 import com.polidea.rxandroidble2.internal.connection.PayloadSizeLimitProvider;
 import com.polidea.rxandroidble2.internal.connection.RxBleGattCallback;
-import com.polidea.rxandroidble2.internal.util.RxBleServicesLogger;
+import com.polidea.rxandroidble2.internal.logger.LoggerUtilBluetoothServices;
 
 import java.util.concurrent.TimeUnit;
 
@@ -25,7 +24,7 @@ public class OperationsProviderImpl implements OperationsProvider {
 
     private final RxBleGattCallback rxBleGattCallback;
     private final BluetoothGatt bluetoothGatt;
-    private final RxBleServicesLogger bleServicesLogger;
+    private final LoggerUtilBluetoothServices bleServicesLogger;
     private final TimeoutConfiguration timeoutConfiguration;
     private final Scheduler bluetoothInteractionScheduler;
     private final Scheduler timeoutScheduler;
@@ -35,7 +34,7 @@ public class OperationsProviderImpl implements OperationsProvider {
     OperationsProviderImpl(
             RxBleGattCallback rxBleGattCallback,
             BluetoothGatt bluetoothGatt,
-            RxBleServicesLogger bleServicesLogger,
+            LoggerUtilBluetoothServices bleServicesLogger,
             @Named(ConnectionModule.OPERATION_TIMEOUT) TimeoutConfiguration timeoutConfiguration,
             @Named(ClientComponent.NamedSchedulers.BLUETOOTH_INTERACTION) Scheduler bluetoothInteractionScheduler,
             @Named(ClientComponent.NamedSchedulers.TIMEOUT) Scheduler timeoutScheduler,
@@ -69,7 +68,7 @@ public class OperationsProviderImpl implements OperationsProvider {
     }
 
     @Override
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
     public MtuRequestOperation provideMtuChangeOperation(int requestedMtu) {
         return new MtuRequestOperation(rxBleGattCallback, bluetoothGatt, timeoutConfiguration, requestedMtu);
     }
@@ -107,11 +106,11 @@ public class OperationsProviderImpl implements OperationsProvider {
     }
 
     @Override
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
     public ConnectionPriorityChangeOperation provideConnectionPriorityChangeOperation(int connectionPriority,
                                                                                       long delay,
                                                                                       TimeUnit timeUnit) {
         return new ConnectionPriorityChangeOperation(rxBleGattCallback, bluetoothGatt, timeoutConfiguration,
-                connectionPriority, delay, timeUnit, timeoutScheduler);
+                connectionPriority, new TimeoutConfiguration(delay, timeUnit, timeoutScheduler));
     }
 }

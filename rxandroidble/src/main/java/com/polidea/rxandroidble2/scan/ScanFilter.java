@@ -1,13 +1,15 @@
 package com.polidea.rxandroidble2.scan;
 
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.os.Parcel;
 import android.os.ParcelUuid;
 import android.os.Parcelable;
-import android.support.annotation.Nullable;
-import com.polidea.rxandroidble2.internal.scan.RxBleInternalScanResult;
+import androidx.annotation.Nullable;
+
+import com.polidea.rxandroidble2.internal.ScanResultInterface;
+import com.polidea.rxandroidble2.internal.logger.LoggerUtil;
+import com.polidea.rxandroidble2.internal.scan.ScanFilterInterface;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -30,7 +32,7 @@ import java.util.UUID;
  * https://code.google.com/p/android/issues/detail?id=181561
  * https://code.google.com/p/android/issues/detail?id=313221
  */
- public final class ScanFilter implements Parcelable {
+ public class ScanFilter implements Parcelable, ScanFilterInterface {
 
     @Nullable
     private final String mDeviceName;
@@ -58,10 +60,10 @@ import java.util.UUID;
     private static final ScanFilter EMPTY = new ScanFilter.Builder().build();
 
 
-    private ScanFilter(String name, String deviceAddress, ParcelUuid uuid,
-                       ParcelUuid uuidMask, ParcelUuid serviceDataUuid,
-                       byte[] serviceData, byte[] serviceDataMask,
-                       int manufacturerId, byte[] manufacturerData, byte[] manufacturerDataMask) {
+    ScanFilter(String name, String deviceAddress, ParcelUuid uuid,
+               ParcelUuid uuidMask, ParcelUuid serviceDataUuid,
+               byte[] serviceData, byte[] serviceDataMask,
+               int manufacturerId, byte[] manufacturerData, byte[] manufacturerDataMask) {
         mDeviceName = name;
         mServiceUuid = uuid;
         mServiceUuidMask = uuidMask;
@@ -156,20 +158,20 @@ import java.util.UUID;
                 }
             }
             if (in.readInt() == 1) {
-                ParcelUuid servcieDataUuid =
+                ParcelUuid serviceDataUuid =
                         in.readParcelable(ParcelUuid.class.getClassLoader());
                 if (in.readInt() == 1) {
                     int serviceDataLength = in.readInt();
                     byte[] serviceData = new byte[serviceDataLength];
                     in.readByteArray(serviceData);
                     if (in.readInt() == 0) {
-                        builder.setServiceData(servcieDataUuid, serviceData);
+                        builder.setServiceData(serviceDataUuid, serviceData);
                     } else {
                         int serviceDataMaskLength = in.readInt();
                         byte[] serviceDataMask = new byte[serviceDataMaskLength];
                         in.readByteArray(serviceDataMask);
                         builder.setServiceData(
-                                servcieDataUuid, serviceData, serviceDataMask);
+                                serviceDataUuid, serviceData, serviceDataMask);
                     }
                 }
             }
@@ -256,31 +258,29 @@ import java.util.UUID;
      * Check if the scan filter matches a {@code scanResult}. A scan result is considered as a match
      * if it matches all the field filters.
      */
-    public boolean matches(RxBleInternalScanResult scanResult) {
+    public boolean matches(ScanResultInterface scanResult) {
         if (scanResult == null) {
             return false;
         }
-        BluetoothDevice device = scanResult.getBluetoothDevice();
+        String address = scanResult.getAddress();
         // Device match.
-        if (mDeviceAddress != null
-                && (device == null || !mDeviceAddress.equals(device.getAddress()))) {
+        if (mDeviceAddress != null && !mDeviceAddress.equals(address)) {
             return false;
         }
 
         ScanRecord scanRecord = scanResult.getScanRecord();
 
-        // Scan record is null but there exist filters on it.
-        if (scanRecord == null
-                && (mDeviceName != null || mServiceUuid != null || mManufacturerData != null
-                || mServiceData != null)) {
-            return false;
-        }
-
         // Local name match.
         if (mDeviceName != null) {
-            if (!(mDeviceName.equals(scanRecord.getDeviceName()) || mDeviceName.equals(device.getName()))) {
+            if (!mDeviceName.equals(scanResult.getDeviceName())
+                    && (scanRecord == null || !mDeviceName.equals(scanRecord.getDeviceName()))) {
                 return false;
             }
+        }
+
+        // if scan record is null we cannot continue. For filter to pass, remaining filter properties must be empty
+        if (scanRecord == null) {
+            return mServiceUuid == null && mManufacturerData == null && mServiceData == null;
         }
 
         // UUID match.
@@ -309,8 +309,8 @@ import java.util.UUID;
     }
 
     // Check if the uuid pattern is contained in a list of parcel uuids.
-    private boolean matchesServiceUuids(ParcelUuid uuid, ParcelUuid parcelUuidMask,
-                                        List<ParcelUuid> uuids) {
+    private static boolean matchesServiceUuids(ParcelUuid uuid, ParcelUuid parcelUuidMask,
+                                               List<ParcelUuid> uuids) {
         if (uuid == null) {
             return true;
         }
@@ -328,7 +328,7 @@ import java.util.UUID;
     }
 
     // Check if the uuid pattern matches the particular service uuid.
-    private boolean matchesServiceUuid(UUID uuid, UUID mask, UUID data) {
+    private static boolean matchesServiceUuid(UUID uuid, UUID mask, UUID data) {
         if (mask == null) {
             return uuid.equals(data);
         }
@@ -341,7 +341,7 @@ import java.util.UUID;
     }
 
     // Check whether the data pattern matches the parsed data.
-    private boolean matchesPartialData(byte[] data, byte[] dataMask, byte[] parsedData) {
+    private static boolean matchesPartialData(byte[] data, byte[] dataMask, byte[] parsedData) {
         if (parsedData == null || parsedData.length < data.length) {
             return false;
         }
@@ -363,12 +363,14 @@ import java.util.UUID;
 
     @Override
     public String toString() {
-        return "BluetoothLeScanFilter [mDeviceName=" + mDeviceName + ", mDeviceAddress="
-                + mDeviceAddress
-                + ", mUuid=" + mServiceUuid + ", mUuidMask=" + mServiceUuidMask
-                + ", mServiceDataUuid=" + String.valueOf(mServiceDataUuid) + ", mServiceData="
-                + Arrays.toString(mServiceData) + ", mServiceDataMask="
-                + Arrays.toString(mServiceDataMask) + ", mManufacturerId=" + mManufacturerId
+        return "BluetoothLeScanFilter [mDeviceName=" + mDeviceName
+                + ", " + LoggerUtil.commonMacMessage(mDeviceAddress)
+                + ", mUuid=" + (mServiceUuid == null ? null : LoggerUtil.getUuidToLog(mServiceUuid.getUuid()))
+                + ", mUuidMask=" + (mServiceUuidMask == null ? null : LoggerUtil.getUuidToLog(mServiceUuidMask.getUuid()))
+                + ", mServiceDataUuid=" + (mServiceDataUuid == null ? null : LoggerUtil.getUuidToLog(mServiceDataUuid.getUuid()))
+                + ", mServiceData=" + Arrays.toString(mServiceData)
+                + ", mServiceDataMask=" + Arrays.toString(mServiceDataMask)
+                + ", mManufacturerId=" + mManufacturerId
                 + ", mManufacturerData=" + Arrays.toString(mManufacturerData)
                 + ", mManufacturerDataMask=" + Arrays.toString(mManufacturerDataMask) + "]";
     }

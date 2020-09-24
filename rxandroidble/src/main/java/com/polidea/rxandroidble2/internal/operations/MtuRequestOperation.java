@@ -1,8 +1,7 @@
 package com.polidea.rxandroidble2.internal.operations;
 
 import android.bluetooth.BluetoothGatt;
-import android.os.Build;
-import android.support.annotation.RequiresApi;
+import androidx.annotation.RequiresApi;
 
 import com.polidea.rxandroidble2.exceptions.BleGattOperationType;
 import com.polidea.rxandroidble2.internal.SingleResponseOperation;
@@ -12,7 +11,7 @@ import bleshadow.javax.inject.Inject;
 
 import io.reactivex.Single;
 
-@RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+@RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
 public class MtuRequestOperation extends SingleResponseOperation<Integer> {
 
     private final int mtu;
@@ -34,5 +33,13 @@ public class MtuRequestOperation extends SingleResponseOperation<Integer> {
     @Override
     protected boolean startOperation(BluetoothGatt bluetoothGatt) {
         return bluetoothGatt.requestMtu(mtu);
+    }
+
+    @Override
+    public String toString() {
+        return "MtuRequestOperation{"
+                + super.toString()
+                + ", mtu=" + mtu
+                + '}';
     }
 }

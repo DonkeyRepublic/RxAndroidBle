@@ -3,11 +3,11 @@ apply plugin: 'groovyx.android'
 apply from: rootProject.file('gradle/gradle-mvn-push.gradle')
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 29
 
     defaultConfig {
         minSdkVersion 18
-        targetSdkVersion 27
+        targetSdkVersion 29
         versionCode 1
         versionName VERSION_NAME
     }
@@ -16,6 +16,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            consumerProguardFiles 'proguard-rules.pro'
         }
     }
 
@@ -48,7 +49,7 @@ androidGroovy {
 
 dependencies {
     api rootProject.ext.libs.rxjava
-    api rootProject.ext.libs.support_annotations
+    api rootProject.ext.libs.annotations
     implementation rootProject.ext.libs.rxrelay
     implementation project(path: ':dagger-library-shadow', transitive: false, configuration: 'shadow')
     annotationProcessor project(path: ':dagger-compiler-shadow', transitive: false, configuration: 'shadow')
@@ -58,9 +59,8 @@ dependencies {
     testImplementation rootProject.ext.libs.junit
     testImplementation rootProject.ext.libs.groovy
     testImplementation rootProject.ext.libs.spock
-    testImplementation rootProject.ext.libs.support
     testImplementation(rootProject.ext.libs.robolectric)
-    testImplementation (rootProject.ext.libs.electricspock){
+    testImplementation(rootProject.ext.libs.electricspock){
         exclude group: 'org.robolectric', module: 'android-all'
     }
 }

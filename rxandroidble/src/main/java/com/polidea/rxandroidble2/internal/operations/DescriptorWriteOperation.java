@@ -11,6 +11,7 @@ import com.polidea.rxandroidble2.internal.connection.RxBleGattCallback;
 
 import bleshadow.javax.inject.Named;
 
+import com.polidea.rxandroidble2.internal.logger.LoggerUtil;
 import io.reactivex.Single;
 
 import static com.polidea.rxandroidble2.internal.util.ByteAssociationUtil.descriptorPredicate;
@@ -18,8 +19,8 @@ import static com.polidea.rxandroidble2.internal.util.ByteAssociationUtil.getByt
 
 public class DescriptorWriteOperation extends SingleResponseOperation<byte[]> {
 
-    private BluetoothGattDescriptor bluetoothGattDescriptor;
-    private byte[] data;
+    private final BluetoothGattDescriptor bluetoothGattDescriptor;
+    private final byte[] data;
     private final int bluetoothGattCharacteristicDefaultWriteType;
 
     DescriptorWriteOperation(RxBleGattCallback rxBleGattCallback,
@@ -62,5 +63,13 @@ public class DescriptorWriteOperation extends SingleResponseOperation<byte[]> {
         final boolean success = bluetoothGatt.writeDescriptor(bluetoothGattDescriptor);
         bluetoothGattCharacteristic.setWriteType(originalWriteType);
         return success;
+    }
+
+    @Override
+    public String toString() {
+        return "DescriptorWriteOperation{"
+                + super.toString()
+                + ", descriptor=" + new LoggerUtil.AttributeLogWrapper(bluetoothGattDescriptor.getUuid(), data, true)
+                + '}';
     }
 }

@@ -1,7 +1,7 @@
 package com.polidea.rxandroidble2.internal;
 
 import android.bluetooth.BluetoothDevice;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import com.jakewharton.rxrelay2.BehaviorRelay;
 import com.polidea.rxandroidble2.ConnectionSetup;
@@ -11,6 +11,7 @@ import com.polidea.rxandroidble2.Timeout;
 import com.polidea.rxandroidble2.exceptions.BleAlreadyConnectedException;
 import com.polidea.rxandroidble2.internal.connection.Connector;
 
+import com.polidea.rxandroidble2.internal.logger.LoggerUtil;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -22,10 +23,10 @@ import io.reactivex.functions.Action;
 @DeviceScope
 class RxBleDeviceImpl implements RxBleDevice {
 
-    private final BluetoothDevice bluetoothDevice;
-    private final Connector connector;
+    final BluetoothDevice bluetoothDevice;
+    final Connector connector;
     private final BehaviorRelay<RxBleConnection.RxBleConnectionState> connectionStateRelay;
-    private AtomicBoolean isConnected = new AtomicBoolean(false);
+    final AtomicBoolean isConnected = new AtomicBoolean(false);
 
     @Inject
     RxBleDeviceImpl(
@@ -70,7 +71,7 @@ class RxBleDeviceImpl implements RxBleDevice {
     public Observable<RxBleConnection> establishConnection(final ConnectionSetup options) {
         return Observable.defer(new Callable<ObservableSource<RxBleConnection>>() {
             @Override
-            public ObservableSource<RxBleConnection> call() throws Exception {
+            public ObservableSource<RxBleConnection> call() {
                 if (isConnected.compareAndSet(false, true)) {
                     return connector.prepareConnection(options)
                             .doFinally(new Action() {
@@ -122,6 +123,9 @@ class RxBleDeviceImpl implements RxBleDevice {
 
     @Override
     public String toString() {
-        return "RxBleDeviceImpl{" + "bluetoothDevice=" + bluetoothDevice.getName() + '(' + bluetoothDevice.getAddress() + ')' + '}';
+        return "RxBleDeviceImpl{"
+                + LoggerUtil.commonMacMessage(bluetoothDevice.getAddress())
+                + ", name=" + bluetoothDevice.getName()
+                + '}';
     }
 }

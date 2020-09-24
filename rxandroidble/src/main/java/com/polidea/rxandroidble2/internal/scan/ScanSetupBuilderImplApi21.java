@@ -1,9 +1,8 @@
 package com.polidea.rxandroidble2.internal.scan;
 
 
-import android.os.Build;
-import android.support.annotation.RequiresApi;
-import android.support.annotation.RestrictTo;
+import androidx.annotation.RequiresApi;
+import androidx.annotation.RestrictTo;
 
 import com.polidea.rxandroidble2.internal.operations.ScanOperationApi21;
 import com.polidea.rxandroidble2.internal.util.RxBleAdapterWrapper;
@@ -12,7 +11,6 @@ import com.polidea.rxandroidble2.scan.ScanSettings;
 
 import bleshadow.javax.inject.Inject;
 
-import io.reactivex.Observable;
 import io.reactivex.ObservableTransformer;
 
 @RestrictTo(RestrictTo.Scope.LIBRARY_GROUP)
@@ -36,7 +34,7 @@ public class ScanSetupBuilderImplApi21 implements ScanSetupBuilder {
         this.androidScanObjectsConverter = androidScanObjectsConverter;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+    @RequiresApi(21 /* Build.VERSION_CODES.LOLLIPOP */)
     @Override
     public ScanSetup build(ScanSettings scanSettings, ScanFilter... scanFilters) {
         /*
@@ -53,12 +51,7 @@ public class ScanSetupBuilderImplApi21 implements ScanSetupBuilder {
                         scanSettings,
                         new EmulatedScanFilterMatcher(scanFilters),
                         null),
-                new ObservableTransformer<RxBleInternalScanResult, RxBleInternalScanResult>() {
-                    @Override
-                    public Observable<RxBleInternalScanResult> apply(Observable<RxBleInternalScanResult> observable) {
-                        return observable.compose(callbackTypeTransformer);
-                    }
-                }
+                callbackTypeTransformer
         );
     }
 }

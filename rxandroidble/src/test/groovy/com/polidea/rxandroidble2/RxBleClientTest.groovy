@@ -3,10 +3,12 @@ package com.polidea.rxandroidble2
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import com.polidea.rxandroidble2.exceptions.BleScanException
+
 import com.polidea.rxandroidble2.internal.RxBleDeviceProvider
 import com.polidea.rxandroidble2.internal.operations.Operation
 import com.polidea.rxandroidble2.internal.scan.*
 import com.polidea.rxandroidble2.internal.serialization.ClientOperationQueue
+import com.polidea.rxandroidble2.internal.util.CheckerLocationPermission
 import com.polidea.rxandroidble2.internal.util.ClientStateObservable
 import com.polidea.rxandroidble2.internal.util.UUIDUtil
 import com.polidea.rxandroidble2.scan.BackgroundScanner
@@ -48,6 +50,7 @@ class RxBleClientTest extends Specification {
     ScanSetup mockScanSetup = new ScanSetup(mockOperationScan, mockObservableTransformer)
     ScanPreconditionsVerifier mockScanPreconditionVerifier = Mock ScanPreconditionsVerifier
     InternalToExternalScanResultConverter mockMapper = Mock InternalToExternalScanResultConverter
+    CheckerLocationPermission mockCheckerLocationPermission = Mock CheckerLocationPermission
     private static someUUID = UUID.randomUUID()
     private static otherUUID = UUID.randomUUID()
     private static Date suggestedDateToRetry = new Date()
@@ -83,7 +86,8 @@ class RxBleClientTest extends Specification {
                 mockMapper,
                 new TestScheduler(),
                 Mock(ClientComponent.ClientComponentFinalizer),
-                backgroundScanner
+                backgroundScanner,
+                mockCheckerLocationPermission
         )
     }
 
@@ -110,10 +114,39 @@ class RxBleClientTest extends Specification {
         scanObservable.test()
 
         then:
-        1 * mockScanPreconditionVerifier.verify()
+        1 * mockScanPreconditionVerifier.verify(true)
 
         where:
         scanStarter << scanStarters
+    }
+
+    @Unroll
+    def "should pass shouldCheckLocationServices value to ScanPreconditionVerifier.verify() accordingly when called with RxBleClient.scanBleDevices(ScanSettings, ScanFilters...)"() {
+
+        given:
+        ScanSettings scanSettings = new ScanSettings.Builder().setShouldCheckLocationServicesState(shouldCheck).build()
+        def scanObservable = objectUnderTest.scanBleDevices(scanSettings)
+
+        when:
+        scanObservable.test()
+
+        then:
+        1 * mockScanPreconditionVerifier.verify(shouldCheck)
+
+        where:
+        shouldCheck << [true, false]
+    }
+
+    def "should call ScanPreconditionVerifier.verify(true) when called with RxBleClient.scanBleDevices(UUID...)"() {
+
+        given:
+        def scanObservable = objectUnderTest.scanBleDevices()
+
+        when:
+        scanObservable.test()
+
+        then:
+        1 * mockScanPreconditionVerifier.verify(true)
     }
 
     @Unroll
@@ -121,7 +154,7 @@ class RxBleClientTest extends Specification {
         given:
         ClientOperationQueue mockQueue = Mock ClientOperationQueue
         Throwable testThrowable = new BleScanException(UNKNOWN_ERROR_CODE, new Date())
-        mockScanPreconditionVerifier.verify() >> { throw testThrowable }
+        mockScanPreconditionVerifier.verify(_) >> { throw testThrowable }
         def scanObservable = scanStarter.call(objectUnderTest)
 
         when:
@@ -271,7 +304,7 @@ class RxBleClientTest extends Specification {
     def "should emit BleScanException if bluetooth has been disabled scan"() {
         given:
         if (!isBluetoothEnabled)
-            mockScanPreconditionVerifier.verify() >> { throw new BleScanException(BleScanException.BLUETOOTH_DISABLED) }
+            mockScanPreconditionVerifier.verify(_) >> { throw new BleScanException(BLUETOOTH_DISABLED) }
 
         when:
         def firstSubscriber = objectUnderTest.scanBleDevices(null).test()
@@ -288,7 +321,7 @@ class RxBleClientTest extends Specification {
     def "should emit error if bluetooth is not available"() {
         given:
         if (!hasBt)
-            mockScanPreconditionVerifier.verify() >> { throw new BleScanException(BleScanException.BLUETOOTH_NOT_AVAILABLE) }
+            mockScanPreconditionVerifier.verify(_) >> { throw new BleScanException(BLUETOOTH_NOT_AVAILABLE) }
 
         when:
         def firstSubscriber = objectUnderTest.scanBleDevices(null).test()
@@ -306,7 +339,7 @@ class RxBleClientTest extends Specification {
     def "should emit BleScanException if location permission was not granted"() {
         given:
         if (!permissionOk)
-            mockScanPreconditionVerifier.verify() >> { throw new BleScanException(BleScanException.LOCATION_PERMISSION_MISSING) }
+            mockScanPreconditionVerifier.verify(_) >> { throw new BleScanException(LOCATION_PERMISSION_MISSING) }
 
         when:
         TestObserver<RxBleScanResult> firstSubscriber = scanStarter.call(objectUnderTest).test()
@@ -324,7 +357,7 @@ class RxBleClientTest extends Specification {
     def "should emit BleScanException if location services are not ok (LocationProviderOk:#providerOk)"() {
         given:
         if (!providerOk)
-            mockScanPreconditionVerifier.verify() >> { throw new BleScanException(BleScanException.LOCATION_SERVICES_DISABLED) }
+            mockScanPreconditionVerifier.verify(_) >> { throw new BleScanException(LOCATION_SERVICES_DISABLED) }
 
 
         when:
@@ -343,8 +376,8 @@ class RxBleClientTest extends Specification {
     def "should emit BleScanException if ScanPreconditionVerifier will suggest a date to start a scan"() {
         given:
         if (dateToRetry != null)
-            mockScanPreconditionVerifier.verify() >> {
-                throw new BleScanException(BleScanException.UNDOCUMENTED_SCAN_THROTTLE, dateToRetry)
+            mockScanPreconditionVerifier.verify(_) >> {
+                throw new BleScanException(UNDOCUMENTED_SCAN_THROTTLE, dateToRetry)
             }
 
         when:
@@ -483,6 +516,37 @@ class RxBleClientTest extends Specification {
     def "should provide injected background scanner"() {
         expect:
         backgroundScanner == objectUnderTest.getBackgroundScanner()
+    }
+
+    @Unroll
+    def "should pass call to CheckerLocationPermission when called .isScanRuntimePermissionGranted() and proxy back the result"() {
+
+        when:
+        def result = objectUnderTest.isScanRuntimePermissionGranted()
+
+        then:
+        1 * mockCheckerLocationPermission.isScanRuntimePermissionGranted() >> expectedResult
+
+        and:
+        result == expectedResult
+
+        where:
+        expectedResult << [true, false]
+    }
+
+    def "should pass call to CheckerLocationPermission when called .getRecommendedScanRuntimePermissions() and proxy back the result"() {
+
+        given:
+        String[] resultRef = new String[0]
+
+        when:
+        def result = objectUnderTest.getRecommendedScanRuntimePermissions()
+
+        then:
+        1 * mockCheckerLocationPermission.getRecommendedScanRuntimePermissions() >> resultRef
+
+        and:
+        result == resultRef
     }
 
     def waitForThreadsToCompleteWork() {

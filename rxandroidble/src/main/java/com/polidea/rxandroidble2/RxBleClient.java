@@ -1,8 +1,8 @@
 package com.polidea.rxandroidble2;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.polidea.rxandroidble2.internal.RxBleLog;
 import com.polidea.rxandroidble2.scan.BackgroundScanner;
@@ -51,7 +51,7 @@ public abstract class RxBleClient {
     public static RxBleClient create(@NonNull Context context) {
         return DaggerClientComponent
                 .builder()
-                .clientModule(new ClientComponent.ClientModule(context))
+                .applicationContext(context.getApplicationContext())
                 .build()
                 .rxBleClient();
     }
@@ -60,10 +60,26 @@ public abstract class RxBleClient {
      * A convenience method.
      * Sets the log level that will be printed out in the console. Default is LogLevel.NONE which logs nothing.
      *
+     * @deprecated use {@link #updateLogOptions(LogOptions)}
      * @param logLevel the minimum log level to log
      */
+    @Deprecated
     public static void setLogLevel(@RxBleLog.LogLevel int logLevel) {
         RxBleLog.setLogLevel(logLevel);
+    }
+
+    /**
+     * Method for updating logging options. Properties not set in {@link LogOptions} will not get updated.
+     * <p>
+     *     Default behaviour: MAC addresses are not logged (MAC='XX:XX:XX:XX:XX:XX'), uuids are not logged (uuid='...'), byte array values
+     *     are not logged (value=[...]), logger is logging to the logcat ({@link android.util.Log}), all scanned peripherals are logged if
+     *     log level allows it, log level is set not to log anything ({@link LogConstants#NONE})
+     * </p>
+     *
+     * @param logOptions the logging options
+     */
+    public static void updateLogOptions(LogOptions logOptions) {
+        RxBleLog.updateLogOptions(logOptions);
     }
 
     /**
@@ -117,7 +133,7 @@ public abstract class RxBleClient {
      * This function works on Android 4.3 in compatibility (emulated) mode.
      *
      * @param scanSettings Scan settings
-     * @param scanFilters Filtering settings
+     * @param scanFilters Filtering settings. ScanResult will be emitted if <i>any</i> of the passed scan filters will match.
      */
     public abstract Observable<ScanResult> scanBleDevices(ScanSettings scanSettings, ScanFilter... scanFilters);
 
@@ -168,4 +184,34 @@ public abstract class RxBleClient {
      * @return the current state
      */
     public abstract State getState();
+
+    /**
+     * Returns whether runtime permissions needed to run a BLE scan are granted. If permissions are not granted then one may check
+     * {@link #getRecommendedScanRuntimePermissions()} to get Android runtime permission strings needed for running a scan.
+     *
+     * @return true if needed permissions are granted, false otherwise
+     */
+    public abstract boolean isScanRuntimePermissionGranted();
+
+    /**
+     * Returns permission strings needed by the application to run a BLE scan or an empty array if no runtime permissions are needed. Since
+     * Android 6.0 runtime permissions were introduced. To run a BLE scan a runtime permission is needed ever since. Since Android 10.0
+     * a different (finer) permission is needed. Only a single permission returned by this function is needed to perform a scan. It is up
+     * to the user to decide which one. The result array is sorted with the least permissive values first.
+     * <p>
+     * Returned values:
+     * <p>
+     * case: API < 23<p>
+     * Empty array. No runtime permissions needed.
+     * <p>
+     * case: 23 <= API < 29<p>
+     * {@link android.Manifest.permission#ACCESS_COARSE_LOCATION}
+     * {@link android.Manifest.permission#ACCESS_FINE_LOCATION}
+     * <p>
+     * case: 29 <= API<p>
+     * {@link android.Manifest.permission#ACCESS_FINE_LOCATION}
+     *
+     * @return an ordered array of possible scan permissions
+     */
+    public abstract String[] getRecommendedScanRuntimePermissions();
 }

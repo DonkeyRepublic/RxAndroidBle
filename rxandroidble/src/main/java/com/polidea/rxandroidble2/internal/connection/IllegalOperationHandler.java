@@ -2,7 +2,7 @@ package com.polidea.rxandroidble2.internal.connection;
 
 
 import android.bluetooth.BluetoothGattCharacteristic;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 
 import com.polidea.rxandroidble2.internal.BluetoothGattCharacteristicProperty;
 import com.polidea.rxandroidble2.internal.BleIllegalOperationException;
@@ -12,7 +12,7 @@ import com.polidea.rxandroidble2.internal.BleIllegalOperationException;
  */
 public abstract class IllegalOperationHandler {
 
-    protected IllegalOperationMessageCreator messageCreator;
+    protected final IllegalOperationMessageCreator messageCreator;
 
     IllegalOperationHandler(IllegalOperationMessageCreator messageCreator) {
         this.messageCreator = messageCreator;

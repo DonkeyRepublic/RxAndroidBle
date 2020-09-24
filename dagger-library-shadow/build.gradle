@@ -16,6 +16,7 @@ apply from: "${buildSrcDir}/shadow.gradle"
 
 import com.github.jengelman.gradle.plugins.shadow.transformers.ServiceFileTransformer
 shadowJar {
+    mustRunAfter jar
     transform(ServiceFileTransformer)
     classifier = ''
 }
@@ -25,5 +26,5 @@ artifacts {
 }
 
 dependencies {
-    compile rootProject.ext.libs.dagger
+    implementation rootProject.ext.libs.dagger
 }

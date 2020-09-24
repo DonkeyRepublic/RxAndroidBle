@@ -1,11 +1,10 @@
 package com.polidea.rxandroidble2.helpers;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import com.polidea.rxandroidble2.ClientComponent;
 import com.polidea.rxandroidble2.DaggerClientComponent;
-import com.polidea.rxandroidble2.internal.util.DisposableUtil;
 
 import java.util.UUID;
 
@@ -13,7 +12,6 @@ import bleshadow.javax.inject.Inject;
 import bleshadow.javax.inject.Named;
 import io.reactivex.Observable;
 import io.reactivex.Observer;
-import io.reactivex.observers.DisposableObserver;
 
 /**
  * An Observable that emits false if an attempt to scan with {@link com.polidea.rxandroidble2.RxBleClient#scanBleDevices(UUID...)}
@@ -29,7 +27,7 @@ public class LocationServicesOkObservable extends Observable<Boolean> {
     public static LocationServicesOkObservable createInstance(@NonNull final Context context) {
         return DaggerClientComponent
                 .builder()
-                .clientModule(new ClientComponent.ClientModule(context))
+                .applicationContext(context.getApplicationContext())
                 .build()
                 .locationServicesOkObservable();
     }
@@ -43,8 +41,6 @@ public class LocationServicesOkObservable extends Observable<Boolean> {
 
     @Override
     protected void subscribeActual(final Observer<? super Boolean> observer) {
-        final DisposableObserver<? super Boolean> disposableObserver = DisposableUtil.disposableObserver(observer);
-        observer.onSubscribe(disposableObserver);
-        locationServicesOkObsImpl.subscribeWith(disposableObserver);
+        locationServicesOkObsImpl.subscribe(observer);
     }
 }

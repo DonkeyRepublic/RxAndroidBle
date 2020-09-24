@@ -1,7 +1,8 @@
 package com.polidea.rxandroidble2.sample.example5_rssi_periodic;
 
 import android.os.Bundle;
-import android.support.design.widget.Snackbar;
+import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.snackbar.Snackbar;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -10,7 +11,6 @@ import com.polidea.rxandroidble2.RxBleDevice;
 import com.polidea.rxandroidble2.sample.DeviceActivity;
 import com.polidea.rxandroidble2.sample.R;
 import com.polidea.rxandroidble2.sample.SampleApplication;
-import com.trello.rxlifecycle2.components.support.RxAppCompatActivity;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -19,11 +19,9 @@ import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 
-import static com.trello.rxlifecycle2.android.ActivityEvent.DESTROY;
-import static com.trello.rxlifecycle2.android.ActivityEvent.PAUSE;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public class RssiPeriodicExampleActivity extends RxAppCompatActivity {
+public class RssiPeriodicExampleActivity extends AppCompatActivity {
 
     @BindView(R.id.connection_state)
     TextView connectionStateView;
@@ -33,6 +31,7 @@ public class RssiPeriodicExampleActivity extends RxAppCompatActivity {
     Button connectButton;
     private RxBleDevice bleDevice;
     private Disposable connectionDisposable;
+    private Disposable stateDisposable;
 
     @OnClick(R.id.connect_toggle)
     public void onConnectToggleClick() {
@@ -41,7 +40,6 @@ public class RssiPeriodicExampleActivity extends RxAppCompatActivity {
             triggerDisconnect();
         } else {
             connectionDisposable = bleDevice.establishConnection(false)
-                    .compose(bindUntilEvent(PAUSE))
                     .doFinally(this::clearSubscription)
                     .flatMap(rxBleConnection -> // Set desired interval.
                             Observable.interval(2, SECONDS).flatMapSingle(sequence -> rxBleConnection.readRssi()))
@@ -64,8 +62,7 @@ public class RssiPeriodicExampleActivity extends RxAppCompatActivity {
         bleDevice = SampleApplication.getRxBleClient(this).getBleDevice(macAddress);
 
         // How to listen for connection state changes
-        bleDevice.observeConnectionStateChanges()
-                .compose(bindUntilEvent(DESTROY))
+        stateDisposable = bleDevice.observeConnectionStateChanges()
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::onConnectionStateChange);
     }
@@ -99,5 +96,21 @@ public class RssiPeriodicExampleActivity extends RxAppCompatActivity {
     private void updateUI() {
         final boolean connected = isConnected();
         connectButton.setText(connected ? R.string.disconnect : R.string.connect);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        triggerDisconnect();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        if (stateDisposable != null) {
+            stateDisposable.dispose();
+        }
     }
 }

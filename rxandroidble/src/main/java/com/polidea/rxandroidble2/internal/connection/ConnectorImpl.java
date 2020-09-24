@@ -22,8 +22,8 @@ import io.reactivex.functions.Consumer;
 public class ConnectorImpl implements Connector {
 
     private final ClientOperationQueue clientOperationQueue;
-    private final ConnectionComponent.Builder connectionComponentBuilder;
-    private final Scheduler callbacksScheduler;
+    final ConnectionComponent.Builder connectionComponentBuilder;
+    final Scheduler callbacksScheduler;
 
     @Inject
     public ConnectorImpl(
@@ -39,18 +39,20 @@ public class ConnectorImpl implements Connector {
     public Observable<RxBleConnection> prepareConnection(final ConnectionSetup options) {
         return Observable.defer(new Callable<ObservableSource<RxBleConnection>>() {
             @Override
-            public ObservableSource<RxBleConnection> call() throws Exception {
+            public ObservableSource<RxBleConnection> call() {
                 final ConnectionComponent connectionComponent = connectionComponentBuilder
-                        .connectionModule(new ConnectionModule(options))
+                        .autoConnect(options.autoConnect)
+                        .suppressOperationChecks(options.suppressOperationCheck)
+                        .operationTimeout(options.operationTimeout)
                         .build();
 
                 final Set<ConnectionSubscriptionWatcher> connSubWatchers = connectionComponent.connectionSubscriptionWatchers();
                 return obtainRxBleConnection(connectionComponent)
-                        .delaySubscription(enqueueConnectOperation(connectionComponent))
                         .mergeWith(observeDisconnections(connectionComponent))
+                        .delaySubscription(enqueueConnectOperation(connectionComponent))
                         .doOnSubscribe(new Consumer<Disposable>() {
                             @Override
-                            public void accept(Disposable disposable) throws Exception {
+                            public void accept(Disposable disposable) {
                                 for (ConnectionSubscriptionWatcher csa : connSubWatchers) {
                                     csa.onConnectionSubscribed();
                                 }
@@ -58,7 +60,7 @@ public class ConnectorImpl implements Connector {
                         })
                         .doFinally(new Action() {
                             @Override
-                            public void run() throws Exception {
+                            public void run() {
                                 for (ConnectionSubscriptionWatcher csa : connSubWatchers) {
                                     csa.onConnectionUnsubscribed();
                                 }
@@ -70,10 +72,10 @@ public class ConnectorImpl implements Connector {
         });
     }
 
-    private static Observable<RxBleConnection> obtainRxBleConnection(final ConnectionComponent connectionComponent) {
+    static Observable<RxBleConnection> obtainRxBleConnection(final ConnectionComponent connectionComponent) {
         return Observable.fromCallable(new Callable<RxBleConnection>() {
             @Override
-            public RxBleConnection call() throws Exception {
+            public RxBleConnection call() {
                 // BluetoothGatt is needed for RxBleConnection
                 // BluetoothGatt is produced by RxBleRadioOperationConnect
                 return connectionComponent.rxBleConnection();
@@ -81,11 +83,11 @@ public class ConnectorImpl implements Connector {
         });
     }
 
-    private static Observable<RxBleConnection> observeDisconnections(ConnectionComponent connectionComponent) {
+    static Observable<RxBleConnection> observeDisconnections(ConnectionComponent connectionComponent) {
         return connectionComponent.gattCallback().observeDisconnect();
     }
 
-    private Observable<BluetoothGatt> enqueueConnectOperation(ConnectionComponent connectionComponent) {
+    Observable<BluetoothGatt> enqueueConnectOperation(ConnectionComponent connectionComponent) {
         return clientOperationQueue.queue(connectionComponent.connectOperation());
     }
 }

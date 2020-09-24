@@ -1,12 +1,14 @@
-package com.polidea.rxandroidble2.internal.util;
+package com.polidea.rxandroidble2.internal.logger;
 
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothGattService;
 
+import com.polidea.rxandroidble2.LogConstants;
 import com.polidea.rxandroidble2.RxBleDeviceServices;
 import com.polidea.rxandroidble2.internal.RxBleLog;
+import com.polidea.rxandroidble2.internal.util.CharacteristicPropertiesParser;
 import com.polidea.rxandroidble2.utils.StandardUUIDsParser;
 
 import bleshadow.javax.inject.Inject;
@@ -26,17 +28,17 @@ import bleshadow.javax.inject.Inject;
  * * Client Characteristic Configuration (ce029bc4-f9eb-11e7-8c3f-9a214cf093ae)
  * * Characteristic User Description (ce02a344-f9eb-11e7-8c3f-9a214cf093ae)
  */
-public class RxBleServicesLogger {
+public class LoggerUtilBluetoothServices {
 
     private final CharacteristicPropertiesParser characteristicPropertiesParser;
 
     @Inject
-    RxBleServicesLogger(CharacteristicPropertiesParser characteristicPropertiesParser) {
+    LoggerUtilBluetoothServices(CharacteristicPropertiesParser characteristicPropertiesParser) {
         this.characteristicPropertiesParser = characteristicPropertiesParser;
     }
 
     public void log(RxBleDeviceServices rxBleDeviceServices, BluetoothDevice device) {
-        if (RxBleLog.isAtLeast(RxBleLog.VERBOSE)) {
+        if (RxBleLog.isAtLeast(LogConstants.VERBOSE)) {
             RxBleLog.v("Preparing services description");
             RxBleLog.v(prepareServicesDescription(rxBleDeviceServices, device));
         }
@@ -63,7 +65,7 @@ public class RxBleServicesLogger {
         }
     }
 
-    private void appendDescriptors(StringBuilder descriptionBuilder, BluetoothGattCharacteristic characteristic) {
+    private static void appendDescriptors(StringBuilder descriptionBuilder, BluetoothGattCharacteristic characteristic) {
         if (!characteristic.getDescriptors().isEmpty()) {
             appendDescriptorsHeader(descriptionBuilder);
             for (BluetoothGattDescriptor descriptor : characteristic.getDescriptors()) {
@@ -72,7 +74,7 @@ public class RxBleServicesLogger {
         }
     }
 
-    private void appendDescriptorsHeader(StringBuilder descriptionBuilder) {
+    private static void appendDescriptorsHeader(StringBuilder descriptionBuilder) {
         descriptionBuilder
                 .append('\n')
                 .append('\t')
@@ -80,27 +82,27 @@ public class RxBleServicesLogger {
                 .append("-> Descriptors: ");
     }
 
-    private void appendCharacteristicNameHeader(StringBuilder descriptionBuilder, BluetoothGattCharacteristic characteristic) {
+    private static void appendCharacteristicNameHeader(StringBuilder descriptionBuilder, BluetoothGattCharacteristic characteristic) {
         descriptionBuilder
                 .append('\n')
                 .append('\t').append("* ").append(createCharacteristicName(characteristic))
                 .append(" (")
-                .append(characteristic.getUuid().toString())
+                .append(LoggerUtil.getUuidToLog(characteristic.getUuid()))
                 .append(")");
     }
 
-    private void appendDescriptorNameHeader(StringBuilder descriptionBuilder, BluetoothGattDescriptor descriptor) {
+    private static void appendDescriptorNameHeader(StringBuilder descriptionBuilder, BluetoothGattDescriptor descriptor) {
         descriptionBuilder
                 .append('\n')
                 .append('\t')
                 .append('\t')
                 .append("* ").append(createDescriptorName(descriptor))
                 .append(" (")
-                .append(descriptor.getUuid().toString())
+                .append(LoggerUtil.getUuidToLog(descriptor.getUuid()))
                 .append(")");
     }
 
-    private String createDescriptorName(BluetoothGattDescriptor descriptor) {
+    private static String createDescriptorName(BluetoothGattDescriptor descriptor) {
         final String descriptorName = StandardUUIDsParser.getDescriptorName(descriptor.getUuid());
         return descriptorName == null ? "Unknown descriptor" : descriptorName;
     }
@@ -113,38 +115,38 @@ public class RxBleServicesLogger {
                 .append("Properties: ").append(characteristicPropertiesParser.propertiesIntToString(characteristic.getProperties()));
     }
 
-    private String createCharacteristicName(BluetoothGattCharacteristic characteristic) {
+    private static String createCharacteristicName(BluetoothGattCharacteristic characteristic) {
         final String characteristicName = StandardUUIDsParser.getCharacteristicName(characteristic.getUuid());
         return characteristicName == null ? "Unknown characteristic" : characteristicName;
     }
 
-    private void appendDeviceHeader(BluetoothDevice device, StringBuilder descriptionBuilder) {
+    private static void appendDeviceHeader(BluetoothDevice device, StringBuilder descriptionBuilder) {
         descriptionBuilder
                 .append("--------------- ====== Printing peripheral content ====== ---------------\n")
-                .append("PERIPHERAL ADDRESS: ").append(device.getAddress()).append('\n')
+                .append(LoggerUtil.commonMacMessage(device.getAddress())).append('\n')
                 .append("PERIPHERAL NAME: ").append(device.getName()).append('\n')
                 .append("-------------------------------------------------------------------------");
     }
 
-    private void appendServiceHeader(StringBuilder descriptionBuilder, BluetoothGattService bluetoothGattService) {
+    private static void appendServiceHeader(StringBuilder descriptionBuilder, BluetoothGattService bluetoothGattService) {
         descriptionBuilder
                 .append("\n")
                 .append(createServiceType(bluetoothGattService))
                 .append(" - ")
                 .append(createServiceName(bluetoothGattService))
                 .append(" (")
-                .append(bluetoothGattService.getUuid().toString())
+                .append(LoggerUtil.getUuidToLog(bluetoothGattService.getUuid()))
                 .append(")\n")
                 .append("Instance ID: ").append(bluetoothGattService.getInstanceId())
                 .append('\n');
     }
 
-    private String createServiceName(BluetoothGattService bluetoothGattService) {
+    private static String createServiceName(BluetoothGattService bluetoothGattService) {
         final String serviceName = StandardUUIDsParser.getServiceName(bluetoothGattService.getUuid());
         return serviceName == null ? "Unknown service" : serviceName;
     }
 
-    private String createServiceType(BluetoothGattService bluetoothGattService) {
+    private static String createServiceType(BluetoothGattService bluetoothGattService) {
         if (bluetoothGattService.getType() == BluetoothGattService.SERVICE_TYPE_PRIMARY) {
             return "Primary Service";
         } else {

@@ -3,8 +3,7 @@ package com.polidea.rxandroidble2.sample.example1a_background_scanning;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import android.support.annotation.RequiresApi;
+import androidx.annotation.RequiresApi;
 import android.util.Log;
 
 import com.polidea.rxandroidble2.exceptions.BleScanException;
@@ -16,7 +15,7 @@ import java.util.List;
 
 public class ScanReceiver extends BroadcastReceiver {
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
+    @RequiresApi(26 /* Build.VERSION_CODES.O */)
     @Override
     public void onReceive(Context context, Intent intent) {
         BackgroundScanner backgroundScanner = SampleApplication.getRxBleClient(context).getBackgroundScanner();

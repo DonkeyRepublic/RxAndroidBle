@@ -1,9 +1,9 @@
 package com.polidea.rxandroidble2.exceptions;
 
-import android.support.annotation.IntDef;
+import androidx.annotation.IntDef;
 
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Date;
@@ -39,7 +39,8 @@ public class BleScanException extends BleException {
 
     /**
      * Scan did not start correctly because the user did not accept access to location services. On Android 6.0 and up you must ask the
-     * user about <b>ACCESS_COARSE_LOCATION</b> in runtime.
+     * user about <b>ACCESS_COARSE_LOCATION</b> or <b>ACCESS_FINE_LOCATION</b> in runtime. On Android 10.0 and above only
+     * <b>ACCESS_FINE_LOCATION</b> is accepted.
      */
     public static final int LOCATION_PERMISSION_MISSING = 3;
 

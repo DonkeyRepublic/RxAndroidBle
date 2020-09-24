@@ -1,28 +1,12 @@
 # RxAndroidBle [![Build Status](https://travis-ci.org/Polidea/RxAndroidBle.svg?branch=master)](https://travis-ci.org/Polidea/RxAndroidBle) [![Maven Central](https://img.shields.io/maven-central/v/com.polidea.rxandroidble2/rxandroidble.svg)](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.polidea.rxandroidble2%22%20AND%20a%3A%22rxandroidble%22)
 <p align="center">
-  <img alt="Tailored software services including concept, design, development and testing" src="site/logo_android.png" />
+  <img 
+    alt="Tailored software services including concept, design, development and testing"
+    src="site/RX-Android.png"
+    height="300"
+    style="margin-top: 20px; margin-bottom: 20px;"
+  />
 </p>
-
-## RxJava2.X :tada: :confetti_ball: :tada:
-
-This version of RxAndroidBLE supports RxJava2.X natively. If you are migrating from RxJava 1 you'll have to use new artifact:
-
-Was:
-```groovy
-compile "com.polidea.rxandroidble:rxandroidble:x.y.z"
-```
-
-Is:
-```groovy
-compile "com.polidea.rxandroidble2:rxandroidble:x.y.z"
-```
-
-At the current stage we do not plan to provide a migration guide, however vanilla RxJava1 -> RxJava 2 guides apply well.
-
-Therefore, RxJava1 based version reaches state of a **feature freeze** from now on. We will support it in terms of bug fixes till **30th June 2018**, so please plan your migrations ahead of time.
-
-You can read more about differences [here](https://github.com/ReactiveX/RxJava/wiki/What%27s-different-in-2.0).
-
 
 ## Introduction
 
@@ -84,7 +68,7 @@ scanSubscription.dispose();
 For devices with API <21 (before Lollipop) the scan API is emulated to get the same behaviour.
 
 ### Observing client state
-On Android it is not always trivial to determine if a particular BLE operation has a potential to succeed. i.e. to scan on Android 6.0 the device needs to have a `BluetoothAdapter`, the application needs to have a granted permission to use either `ACCESS_COARSE_LOCATION` or `ACCESS_FINE_LOCATION` and `Location Services` needs to be turned on.
+On Android it is not always trivial to determine if a particular BLE operation has a potential to succeed. e.g. to scan on Android 6.0 the device needs to have a `BluetoothAdapter`, the application needs to have a granted [runtime permission](https://github.com/Polidea/RxAndroidBle#permissions) for either `ACCESS_COARSE_LOCATION` or `ACCESS_FINE_LOCATION`, additionally `Location Services` need to be turned on.
 To be sure that the scan will work only when everything is ready you could use:
 
 ```java
@@ -221,7 +205,7 @@ device.establishConnection(false)
 ```java
 device.establishConnection(false)
     .flatMapSingle(rxBleConnection -> rxBleConnection.readCharacteristic(characteristicUuid)
-        .doOnNext(bytes -> {
+        .doOnSuccess(bytes -> {
             // Process read data.
         })
         .flatMap(bytes -> rxBleConnection.writeCharacteristic(characteristicUuid, bytesToWrite))
@@ -279,47 +263,35 @@ RxBleLog.setLogger((level, tag, msg) -> Timber.tag(tag).log(level, msg));
 ```
 
 ### Error handling
-Every error you may encounter is provided via onError callback. Each public method has JavaDoc explaining possible errors.
-
-*Important* — Prior to version `1.3.0` each failure on `BluetoothGatt` was effectively closing the connection. From `1.3.0` onwards individual errors will not close the connection if they are not directly related to it. This change does allow to retry operations (i.e. after Android will establish a device bond).
+Every error you may encounter is provided via `onError` callback. Each public method has JavaDoc explaining possible errors.
 
 ### Observable behaviour
 From different interfaces, you can obtain different `Observable`s which exhibit different behaviours.
-There are three types of `Observable`s that you may encounter.
-1. Single value, completing — i.e. `RxBleConnection.readCharacteristic()`, `RxBleConnection.writeCharacteristic()`, etc.
-2. Multiple values, not completing - i.e. `RxBleClient.scan()`, `RxBleDevice.observeConnectionStateChanges()` and `Observable` emitted by `RxBleConnection.setupNotification()` / `RxBleConnection.setupIndication()`
-3. Single value, not completing — these usually are meant for auto cleanup upon disposing i.e. `setupNotification()` / `setupIndication()` — when you will dispose the notification / indication will be disabled 
+There are two types of `Observable`s that you may encounter.
+1. Multiple values - i.e. `RxBleClient.scan()`, `RxBleDevice.observeConnectionStateChanges()` and `Observable` emitted by `RxBleConnection.setupNotification()` / `RxBleConnection.setupIndication()`
+2. One value — these usually are meant for auto cleanup upon disposing i.e. `setupNotification()` / `setupIndication()` — when you will dispose the notification / indication will be disabled 
 
 `RxBleDevice.establishConnection()` is an `Observable` that will emit a single `RxBleConnection` but will not complete as the connection may be later a subject to an error (i.e. external disconnection). Whenever you are no longer interested in keeping the connection open you should dispose it which will cause disconnection and cleanup of resources. 
 
 The below table contains an overview of used `Observable` patterns
 
-| Interface | Function | Number of values | Completes | [Hot/Cold](https://medium.com/@benlesh/hot-vs-cold-observables-f8094ed53339)
-| --- | --- | --- | --- | --- |
-| RxBleClient | scanBleDevices()* | Infinite | false | cold |
-| RxBleClient | observeStateChanges() | Infinite** | false** | hot |
-| RxBleDevice | observeConnectionStateChanges() | Infinite | false | hot |
-| RxBleDevice | establishConnection()* | Single | false | cold |
-| RxBleConnection | discoverServices() | Single | true | cold |
-| RxBleConnection | setupNotification()* | Single | false | cold |
-| RxBleConnection | setupNotification() emitted Observable | Infinite | false | hot |
-| RxBleConnection | setupIndication()* | Single | false | cold |
-| RxBleConnection | setupIndication() emitted Observable | Infinite | false | hot |
-| RxBleConnection | getCharacteristic() | Single | true | cold |
-| RxBleConnection | readCharacteristic() | Single | true | cold |
-| RxBleConnection | writeCharacteristic() | Single | true | cold |
-| RxBleConnection | readDescriptor() | Single | true | cold |
-| RxBleConnection | writeDescriptor() | Single | true | cold |
-| RxBleConnection | readRssi() | Single | true | cold |
-| RxBleConnection | requestMtu() | Single | true | cold |
-| RxBleConnection | queue() | User defined | User defined | cold |
-| LongWriteOperationBuilder | build() | Single | true | cold |
+| Interface | Function | Number of values | [Hot/Cold](https://medium.com/@benlesh/hot-vs-cold-observables-f8094ed53339)
+| --- | --- | --- | --- |
+| RxBleClient | scanBleDevices()* | Infinite | cold |
+| RxBleClient | observeStateChanges() | Infinite** | hot |
+| RxBleDevice | observeConnectionStateChanges() | Infinite | hot |
+| RxBleDevice | establishConnection()* | One | cold |
+| RxBleConnection | setupNotification()* | One | cold |
+| RxBleConnection | setupNotification() emitted Observable | Infinite** | hot |
+| RxBleConnection | setupIndication()* | One | cold |
+| RxBleConnection | setupIndication() emitted Observable | Infinite** | hot |
+| RxBleConnection | queue() | User defined | cold |
 
 \* this `Observable` when disposed closes/cleans up internal resources (i.e. finishes scan, closes a connection, disables notifications)<br>
-\** this `Observable` does emit only a single value and finishes in exactly one situation — when Bluetooth Adapter is not available on the device. There is no reason to monitor other states as the adapter does not appear during runtime.
+\** this `Observable` may complete. For example `observeStateChanges()` does emit only a single value and finishes in exactly one situation — when Bluetooth Adapter is not available on the device. There is no reason to monitor other states as the adapter does not appear during runtime. A second example: Observables emitted from `setupNotification` / `setupIndication` may complete when the parent Observable is disposed.
 
 ### Helpers
-We encourage you to check the package `com.polidea.rxandroidble.helpers` which contains handy reactive wrappers for some typical use-cases.
+We encourage you to check the package [`com.polidea.rxandroidble2.helpers`](https://github.com/Polidea/RxAndroidBle/tree/master/rxandroidble/src/main/java/com/polidea/rxandroidble2/helpers) and [`com.polidea.rxandroidble2.utils`](https://github.com/Polidea/RxAndroidBle/tree/master/rxandroidble/src/main/java/com/polidea/rxandroidble2/utils) which contain handy reactive wrappers for some typical use-cases.
 
 #### Value interpretation
 Bluetooth Specification specifies formats in which `int`/`float`/`String` values may be stored in characteristics. `BluetoothGattCharacteristic` has functions for retrieving those (`.getIntValue()`/`.getFloatValue()`/`.getStringValue()`).
@@ -329,22 +301,42 @@ Since `RxAndroidBle` reads and notifications emit `byte[]` you may want to use `
 If you would like to observe `BluetoothAdapter` state changes you can use `RxBleAdapterStateObservable`.
 
 ### Permissions
-RxAndroidBle already provides all the necessary bluetooth permissions for you. Recently, Google has started checking these when releasing to the Play Store. If you have ACCESS_COARSE_LOCATION set manually you may run into an issue where your permission do not merge with RxAndroidBle's, resulting in a failure to upload to the Play Store This permission is only required on SDK 23+. If you need this permission on a lower version of Android use:
+Android since API 23 (6.0 / Marshmallow) requires location permissions declared in the manifest for an app to run a BLE scan. RxAndroidBle already provides all the necessary bluetooth permissions for you in AndroidManifest.
 
+Runtime permissions required for running a BLE scan:
+
+| from API | to API (inclusive) | Acceptable runtime permissions |
+|:---:|:---:| --- |
+| 18 | 22 | (No runtime permissions needed) |
+| 23 | 28 | One of below:<br>- `android.permission.ACCESS_COARSE_LOCATION`<br>- `android.permission.ACCESS_FINE_LOCATION` |
+| 29 | current | - `android.permission.ACCESS_FINE_LOCATION` |
+
+#### Potential permission issues
+Google is checking `AndroidManifest` for declaring permissions when releasing to the Play Store. If you have `ACCESS_COARSE_LOCATION` or `ACCESS_FINE_LOCATION` set manually using tag `uses-permission` (as opposed to `uses-permission-sdk-23`) you may run into an issue where your manifest does not merge with RxAndroidBle's, resulting in a failure to upload to the Play Store. These permissions are only required on SDK 23+. If you need any of these permissions on a lower version of Android replace your statement with:
 ```xml
 <uses-permission
   android:name="android.permission.ACCESS_COARSE_LOCATION"
   android:maxSdkVersion="22"/>
 ```
+```xml
+<uses-permission
+  android:name="android.permission.ACCESS_FINE_LOCATION"
+  android:maxSdkVersion="22"/>
+```
+
 ## More examples
 
-Complete usage examples are located in `/sample` [GitHub repo](https://github.com/Polidea/RxAndroidBle/tree/master/sample/src/main/java/com/polidea/rxandroidble2/sample).
+Usage examples are located in:
+- [`/sample`](https://github.com/Polidea/RxAndroidBle/tree/master/sample/src/main/java/com/polidea/rxandroidble2/sample)
+- [`/sample-kotlin`](https://github.com/Polidea/RxAndroidBle/tree/master/sample-kotlin/src/main/kotlin/com/polidea/rxandroidble2/samplekotlin)
+
+Keep in mind that these are only _samples_ to show how the library can be used. These are not meant for being role model of a good application architecture.
 
 ## Download
 ### Gradle
 
 ```groovy
-compile "com.polidea.rxandroidble2:rxandroidble:1.6.0"
+implementation "com.polidea.rxandroidble2:rxandroidble:1.11.1"
 ```
 ### Maven
 
@@ -352,14 +344,14 @@ compile "com.polidea.rxandroidble2:rxandroidble:1.6.0"
 <dependency>
   <groupId>com.polidea.rxandroidble2</groupId>
   <artifactId>rxandroidble</artifactId>
-  <version>1.6.0</version>
+  <version>1.11.1</version>
   <type>aar</type>
 </dependency>
 ```
 
 ### Snapshot
 If your are interested in cutting-edge build you can get a `SNAPSHOT` version of the library. 
-NOTE: It is built from the top of the `master` branch and a subject to more frequent changes that may break the API and/or change behavior.
+NOTE: Snapshots are built from the top of the `master` and `develop` branches and a subject to more frequent changes that may break the API and/or change behavior.
 
 To be able to download it you need to add Sonatype Snapshot repository site to your `build.gradle` file:
 ```groovy
@@ -395,12 +387,15 @@ If you encounter seemingly incorrect behaviour in your application that is regar
 * non-commercial — head to [StackOverflow #rxandroidble](https://stackoverflow.com/questions/tagged/rxandroidble)
 * commercial — drop an email to hello@polidea.com for more info
 
+[Contact us](https://www.polidea.com/project/?utm_source=Github&utm_medium=Npaid&utm_campaign=Kontakt&utm_term=Code&utm_content=GH_NOP_KKT_COD_RAB001)
+
+Learn more about Polidea's BLE services [here](https://www.polidea.com/services/ble/?utm_source=Github&utm_medium=Npaid&utm_campaign=Tech_BLE&utm_term=Code&utm_content=GH_NOP_BLE_COD_RAB001)
+
 ## Discussions
 Want to talk about it? Join our discussion on [Gitter](https://gitter.im/RxBLELibraries/RxAndroidBle)
 
 ## Maintainers
-* Dariusz Seweryn (dariusz.seweryn@polidea.com)
-* Paweł Urban (pawel.urban@polidea.com)
+* Dariusz Seweryn (github: dariuszseweryn)
 
 ## [Contributors](https://github.com/Polidea/RxAndroidBle/graphs/contributors), thank you!
 
